@@ -45,16 +45,3 @@ class BaseLine(nn.Module):
         x = self.linear(x)
         x = self.sigmoid(x).squeeze()
         return x
-
-
-class Word2Vec(nn.Module):
-    def __init__(self, vocab_size, embedding_dim):
-        super(Word2Vec, self).__init__()
-        self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx=1)
-        self.W = Variable(torch.randn(embedding_dim, vocab_size, device='cuda'), requires_grad=True)
-
-    def forward(self, x, sample):
-        x = self.embedding(x)  # x: (window_size,) -> (window_size, embedding_dim)
-        x = torch.sum(x, 0)
-        x = torch.matmul(x, self.W[:, sample])  # (sample_size,)
-        return torch.sigmoid(x)

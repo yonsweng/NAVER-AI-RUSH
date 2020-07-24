@@ -14,16 +14,9 @@ import numpy as np
 import nsml
 from nsml import DATASET_PATH, HAS_DATASET, GPU_NUM, IS_ON_NSML
 from torchtext.data import Example
-
-from model import BaseLine, Word2Vec
+from model import BaseLine
 from data import HateSpeech
-
 from sklearn.metrics import recall_score, precision_score, f1_score
-
-# WORD2VEC_LOAD = True
-# WORD2VEC_CHECKPOINT = 'word2vec1199999'
-# WORD2VEC_SESSION = 'yonsweng/hate_2/73'
-# print(WORD2VEC_CHECKPOINT, WORD2VEC_SESSION)
 
 
 def bind_model(model):
@@ -176,24 +169,19 @@ class Trainer(object):
 
     def train(self):
         max_epoch = 32
-        lr = LEARNING_RATE
         optimizer = optim.Adam(self.model.parameters(), lr=LEARNING_RATE)
         total_len = len(self.task.datasets[0])
         ds_iter = Iterator(self.task.datasets[0], batch_size=self.batch_size, repeat=False,
-                           shuffle=True, train=True, device=self.device)
-        min_iters = 10
-        for epoch in range(max_epoch):
-            loss_sum, acc_sum, len_batch_sum = 0., 0., 0.
-            ds_iter.init_epoch()
-            tr_total = math.ceil(total_len / self.batch_size)
-            tq_iter = tqdm(enumerate(ds_iter), total=tr_total, miniters=min_iters, unit_scale=self.batch_size,
-                           bar_format='{n_fmt}/{total_fmt} [{elapsed}<{remaining} {rate_fmt}] {desc}')
+                           sort_key=lambda x: len(x.syllable_contents), train=True, device=self.device)
 
+        for epoch in range(max_epoch):
+            loss_sum, acc_sum = 0., 0.
+            ds_iter.init_epoch()
             true_lst = list()
             pred_lst = list()
 
             self.model.train()
-            for i, batch in tq_iter:
+            for i, batch in enumerate(ds_iter):
                 self.model.zero_grad()
                 pred = self.model(batch.syllable_contents)
                 acc = torch.sum((torch.reshape(pred, [-1]) > 0.5) == (batch.eval_reply > 0.5), dtype=torch.float32)
@@ -203,24 +191,15 @@ class Trainer(object):
 
                 true_lst += batch.eval_reply.tolist()
                 pred_lst += pred.tolist()
-
-                len_batch = len(batch)
-                len_batch_sum += len_batch
                 acc_sum += acc.tolist()
-                loss_sum += loss.tolist() * len_batch
-                if i % min_iters == 0:
-                    tq_iter.set_description('{:2} loss: {:.5}, acc: {:.5}'.format(epoch, loss_sum / len_batch_sum, acc_sum / len_batch_sum), True)
-                if i == 3000:
-                    break
+                loss_sum += loss.tolist() * len(batch)
 
-            # calc f1-score
+            # calc training f1-score
             y_true = np.array(true_lst) > 0.5
             y_pred = np.array(pred_lst) > 0.5
             train_recall_score = recall_score(y_true, y_pred)
             train_precision_score = precision_score(y_true, y_pred)
             train_f1_score = f1_score(y_true, y_pred)
-
-            tq_iter.set_description('{:2} loss: {:.5}, acc: {:.5}'.format(epoch, loss_sum / total_len, acc_sum / total_len), True)
             print(json.dumps(
                 {'type': 'train', 'dataset': 'hate_speech',
                  'epoch': epoch, 'loss': loss_sum / total_len, 'acc': acc_sum / total_len,
@@ -228,7 +207,7 @@ class Trainer(object):
 
             pred_lst, loss_avg, acc_lst, te_total = self.eval(self.test_iter, len(self.task.datasets[1]))
 
-            # calc f1-score
+            # calc test f1-score
             y_pred = np.array(pred_lst) > 0.5
             y_true = np.where(np.array(acc_lst) > 0.5, y_pred, 1 - y_pred)
             test_recall_score = recall_score(y_true, y_pred)
@@ -275,14 +254,17 @@ class Trainer(object):
 
 if __name__ == '__main__':
     # Constants
-    HIDDEN_DIM = 128
-    FILTER_SIZE = 4
-    CONV_PADDING = 1
-    DROPOUT_RATE = 0.5
-    EMBEDDING_SIZE = 128
-    BATCH_SIZE = 64
+    HIDDEN_DIM = 256
+    FILTER_SIZE = 3
+    CONV_PADDING = 0
+    DROPOUT_RATE = 0.3
+    EMBEDDING_SIZE = 384
+    BATCH_SIZE = 128
     LSTM_LAYERS = 1
     LEARNING_RATE = 0.001
+    # WORD2VEC_LOAD = True
+    # WORD2VEC_CHECKPOINT = 'word2vec1199999'
+    # WORD2VEC_SESSION = 'yonsweng/hate_2/73'
     print(f'HIDDEN_DIM: {HIDDEN_DIM}')
     print(f'FILTER_SIZE: {FILTER_SIZE}')
     print(f'CONV_PADDING: {CONV_PADDING}')
@@ -291,6 +273,9 @@ if __name__ == '__main__':
     print(f'BATCH_SIZE: {BATCH_SIZE}')
     print(f'LSTM_NUM_LAYERS: {LSTM_LAYERS}')
     print(f'LEARNING_RATE: {LEARNING_RATE}')
+    # print(f'WORD2VEC_LOAD: {WORD2VEC_LOAD}')
+    # print(f'WORD2VEC_CHECKPOINT: {WORD2VEC_CHECKPOINT}')
+    # print(f'WORD2VEC_SESSION: {WORD2VEC_SESSION}')
 
     parser = ArgumentParser()
     parser.add_argument('--mode', default='train')

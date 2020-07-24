@@ -7,13 +7,14 @@ import torch.optim as optim
 class Word2Vec(nn.Module):
     def __init__(self, vocab_size, embedding_dim):
         super(Word2Vec, self).__init__()
-        self.embedding = nn.Embedding(vocab_size, embedding_dim)
-        self.linear = nn.Linear(embedding_dim, vocab_size)
+        self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx=1)
+        self.W = Variable(torch.randn(embedding_dim, vocab_size, device='cuda'), requires_grad=True)
 
-    def forward(self, x):
-        x = self.embeddings(x)
-        x = self.linear(x)
-        return F.log_softmax(x)
+    def forward(self, x, sample):
+        x = self.embedding(x)  # x: (window_size,) -> (window_size, embedding_dim)
+        x = torch.sum(x, 0)
+        x = torch.matmul(x, self.W[:, sample])  # (sample_size,)
+        return torch.sigmoid(x)
 
 
 word2vec = Word2Vec(11, 384)
