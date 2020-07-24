@@ -20,10 +20,10 @@ from data import HateSpeech
 
 from sklearn.metrics import recall_score, precision_score, f1_score
 
-WORD2VEC_LOAD = True
-WORD2VEC_CHECKPOINT = 'word2vec1199999'
-WORD2VEC_SESSION = 'yonsweng/hate_2/73'
-print(WORD2VEC_CHECKPOINT, WORD2VEC_SESSION)
+# WORD2VEC_LOAD = True
+# WORD2VEC_CHECKPOINT = 'word2vec1199999'
+# WORD2VEC_SESSION = 'yonsweng/hate_2/73'
+# print(WORD2VEC_CHECKPOINT, WORD2VEC_SESSION)
 
 
 def bind_model(model):
@@ -51,20 +51,19 @@ class Trainer(object):
     TRAIN_DATA_PATH = '{}/train/train_data'.format(DATASET_PATH[0])
     UNLABELED_DATA_PATH = '{}/train/raw.json'.format(DATASET_PATH[1])
 
-    def __init__(self, hdfs_host: str = None, device: str = 'cpu'):
+    def __init__(self, model, hdfs_host: str = None, device: str = 'cpu'):
         self.device = device
         self.task = HateSpeech(self.TRAIN_DATA_PATH, (9, 1))  # train 9 : test 1
-        self.embedding = self.train_embedding()
-        # self.model = BaseLine(hidden_dim, 3, 0.2, self.task.max_vocab_indexes['syllable_contents'], 384, self.embedding)
-        self.model = BaseLine(hidden_dim, 3, 0.2, self.task.max_vocab_indexes['syllable_contents'], 64)
+        # self.embedding = self.train_embedding()
+        self.model = model
         self.model.to(self.device)
         self.loss_fn = nn.BCELoss()
-        self.batch_size = 128
+        self.batch_size = BATCH_SIZE
         self.__test_iter = None
         bind_model(self.model)
 
     def train_embedding(self):
-        word2vec = Word2Vec(self.task.max_vocab_indexes['syllable_contents'], 384)
+        word2vec = Word2Vec(self.task.max_vocab_indexes['syllable_contents'], EMBEDDING_SIZE)
         word2vec.to('cuda')
         bind_model(word2vec)
         if WORD2VEC_LOAD:
@@ -177,11 +176,9 @@ class Trainer(object):
 
     def train(self):
         max_epoch = 32
-        lr = 0.0005
-        print('lr:', lr)
-        optimizer = optim.Adam(self.model.parameters(), lr=lr)
+        lr = LEARNING_RATE
+        optimizer = optim.Adam(self.model.parameters(), lr=LEARNING_RATE)
         total_len = len(self.task.datasets[0])
-        print('shuffle: True')
         ds_iter = Iterator(self.task.datasets[0], batch_size=self.batch_size, repeat=False,
                            shuffle=True, train=True, device=self.device)
         min_iters = 10
@@ -277,17 +274,35 @@ class Trainer(object):
 
 
 if __name__ == '__main__':
+    # Constants
+    HIDDEN_DIM = 128
+    FILTER_SIZE = 4
+    CONV_PADDING = 1
+    DROPOUT_RATE = 0.5
+    EMBEDDING_SIZE = 128
+    BATCH_SIZE = 64
+    LSTM_LAYERS = 1
+    LEARNING_RATE = 0.001
+    print(f'HIDDEN_DIM: {HIDDEN_DIM}')
+    print(f'FILTER_SIZE: {FILTER_SIZE}')
+    print(f'CONV_PADDING: {CONV_PADDING}')
+    print(f'DROPOUT_RATE: {DROPOUT_RATE}')
+    print(f'EMBEDDING_SIZE: {EMBEDDING_SIZE}')
+    print(f'BATCH_SIZE: {BATCH_SIZE}')
+    print(f'LSTM_NUM_LAYERS: {LSTM_LAYERS}')
+    print(f'LEARNING_RATE: {LEARNING_RATE}')
+
     parser = ArgumentParser()
     parser.add_argument('--mode', default='train')
     parser.add_argument('--pause', default=0)
     args = parser.parse_args()
     task = HateSpeech()
-    model = BaseLine(HIDDEN_DIM, FILTER_SIZE, DROPOUT_RATE, task.max_vocab_indexes['syllable_contents'], 384)
+    vocab_size = task.max_vocab_indexes['syllable_contents']
+    model = BaseLine(HIDDEN_DIM, FILTER_SIZE, DROPOUT_RATE, vocab_size, EMBEDDING_SIZE, LSTM_LAYERS, CONV_PADDING)
     if args.pause:
-        
         model.to("cuda")
         bind_model(model)
         nsml.paused(scope=locals())
     if args.mode == 'train':
-        trainer = Trainer(device='cuda')
+        trainer = Trainer(model, device='cuda')
         trainer.train()
