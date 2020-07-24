@@ -168,7 +168,7 @@ class Trainer(object):
             return self.__test_iter
 
     def train(self):
-        max_epoch = 32
+        max_epoch = 16
         optimizer = optim.Adam(self.model.parameters(), lr=LEARNING_RATE)
         total_len = len(self.task.datasets[0])
         ds_iter = Iterator(self.task.datasets[0], batch_size=self.batch_size, repeat=False,
@@ -205,11 +205,11 @@ class Trainer(object):
                  'epoch': epoch, 'loss': loss_sum / total_len, 'acc': acc_sum / total_len,
                  'recall': train_recall_score, 'precision': train_precision_score, 'f1': train_f1_score}))
 
-            pred_lst, loss_avg, acc_lst, te_total = self.eval(self.test_iter, len(self.task.datasets[1]))
+            true_lst, pred_lst, loss_avg, acc_lst, te_total = self.eval(self.test_iter, len(self.task.datasets[1]))
 
             # calc test f1-score
+            y_true = np.array(true_lst) > 0.5
             y_pred = np.array(pred_lst) > 0.5
-            y_true = np.where(np.array(acc_lst) > 0.5, y_pred, 1 - y_pred)
             test_recall_score = recall_score(y_true, y_pred)
             test_precision_score = precision_score(y_true, y_pred)
             test_f1_score = f1_score(y_true, y_pred)
@@ -231,19 +231,21 @@ class Trainer(object):
     def eval(self, iter:Iterator, total:int) -> (List[float], float, List[float], int):
         tq_iter = tqdm(enumerate(iter), total=math.ceil(total / self.batch_size),
                        unit_scale=self.batch_size, bar_format='{r_bar}')
+        true_lst = list()
         pred_lst = list()
-        loss_sum= 0.
         acc_lst = list()
+        loss_sum = 0.
 
         self.model.eval()
         for i, batch in tq_iter:
             preds = self.model(batch.syllable_contents)
             accs = torch.eq(preds > 0.5, batch.eval_reply > 0.5).to(torch.float)
             losses = self.loss_fn(preds, batch.eval_reply)
-            pred_lst += preds.tolist()
+            true_lst += batch.eval_reply.tolist()  # real label
+            pred_lst += preds.tolist()  # prediction
             acc_lst += accs.tolist()
             loss_sum += losses.tolist() * len(batch)
-        return pred_lst, loss_sum / total, acc_lst, total
+        return true_lst, pred_lst, loss_sum / total, acc_lst, total
 
     def save_model(self, model, appendix=None):
         file_name = 'model'
@@ -260,7 +262,7 @@ if __name__ == '__main__':
     DROPOUT_RATE = 0.3
     EMBEDDING_SIZE = 384
     BATCH_SIZE = 128
-    LSTM_LAYERS = 1
+    GRU_LAYERS = 1
     LEARNING_RATE = 0.001
     # WORD2VEC_LOAD = True
     # WORD2VEC_CHECKPOINT = 'word2vec1199999'
@@ -271,7 +273,7 @@ if __name__ == '__main__':
     print(f'DROPOUT_RATE: {DROPOUT_RATE}')
     print(f'EMBEDDING_SIZE: {EMBEDDING_SIZE}')
     print(f'BATCH_SIZE: {BATCH_SIZE}')
-    print(f'LSTM_NUM_LAYERS: {LSTM_LAYERS}')
+    print(f'GRU_LAYERS: {GRU_LAYERS}')
     print(f'LEARNING_RATE: {LEARNING_RATE}')
     # print(f'WORD2VEC_LOAD: {WORD2VEC_LOAD}')
     # print(f'WORD2VEC_CHECKPOINT: {WORD2VEC_CHECKPOINT}')
@@ -283,7 +285,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     task = HateSpeech()
     vocab_size = task.max_vocab_indexes['syllable_contents']
-    model = BaseLine(HIDDEN_DIM, FILTER_SIZE, DROPOUT_RATE, vocab_size, EMBEDDING_SIZE, LSTM_LAYERS, CONV_PADDING)
+    model = BaseLine(HIDDEN_DIM, FILTER_SIZE, DROPOUT_RATE, vocab_size, EMBEDDING_SIZE, GRU_LAYERS, CONV_PADDING)
     if args.pause:
         model.to("cuda")
         bind_model(model)
