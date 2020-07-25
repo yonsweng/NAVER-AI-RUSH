@@ -229,15 +229,13 @@ class Trainer(object):
                         test_recall=test_recall_score, test_precision=test_precision_score, test_f1=test_f1_score)
 
     def eval(self, iter:Iterator, total:int) -> (List[float], float, List[float], int):
-        tq_iter = tqdm(enumerate(iter), total=math.ceil(total / self.batch_size),
-                       unit_scale=self.batch_size, bar_format='{r_bar}')
         true_lst = list()
         pred_lst = list()
         acc_lst = list()
         loss_sum = 0.
 
         self.model.eval()
-        for i, batch in tq_iter:
+        for i, batch in enumerate(iter):
             preds = self.model(batch.syllable_contents)
             accs = torch.eq(preds > 0.5, batch.eval_reply > 0.5).to(torch.float)
             losses = self.loss_fn(preds, batch.eval_reply)
@@ -245,6 +243,7 @@ class Trainer(object):
             pred_lst += preds.tolist()  # prediction
             acc_lst += accs.tolist()
             loss_sum += losses.tolist() * len(batch)
+
         return true_lst, pred_lst, loss_sum / total, acc_lst, total
 
     def save_model(self, model, appendix=None):
@@ -259,7 +258,7 @@ if __name__ == '__main__':
     HIDDEN_DIM = 256
     DROPOUT_RATE = 0.3
     EMBEDDING_SIZE = 384
-    BATCH_SIZE = 128
+    BATCH_SIZE = 64
     BI_RNN_LAYERS = 1
     UNI_RNN_LAYERS = 1
     LEARNING_RATE = 0.001
