@@ -66,7 +66,7 @@ class Trainer(object):
             return self.__test_iter
 
     def train(self):
-        max_epoch = 24
+        max_epoch = 32
         optimizer = optim.Adam(self.model.parameters(), lr=LEARNING_RATE)
         total_len = len(self.task.datasets[0])
         ds_iter = Iterator(self.task.datasets[0], batch_size=self.batch_size, repeat=False,
