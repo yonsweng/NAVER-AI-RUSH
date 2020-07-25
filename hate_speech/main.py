@@ -153,7 +153,7 @@ class Trainer(object):
 
 if __name__ == '__main__':
     # Constants
-    HIDDEN_DIM = 256
+    HIDDEN_DIM = 128
     DROPOUT_RATE = 0.3
     EMBEDDING_SIZE = 128
     BATCH_SIZE = 512
