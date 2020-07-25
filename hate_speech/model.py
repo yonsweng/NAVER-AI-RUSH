@@ -7,7 +7,6 @@ class BaseLine(nn.Module):
     def __init__(self, hidden_dim, dropout_rate, vocab_size, embedding_dim, bi_rnn_layers, uni_rnn_layers, pre_trained_embedding=None):
         super().__init__()
         self.hidden_dim = hidden_dim
-        self.filter_size = filter_size
         self.dropout_rate = dropout_rate
         self.embedding_dim = embedding_dim
 
