@@ -257,27 +257,12 @@ class Trainer(object):
 if __name__ == '__main__':
     # Constants
     HIDDEN_DIM = 256
-    FILTER_SIZE = 3
-    CONV_PADDING = 0
     DROPOUT_RATE = 0.3
     EMBEDDING_SIZE = 384
     BATCH_SIZE = 128
-    GRU_LAYERS = 1
+    BI_RNN_LAYERS = 1
+    UNI_RNN_LAYERS = 1
     LEARNING_RATE = 0.001
-    # WORD2VEC_LOAD = True
-    # WORD2VEC_CHECKPOINT = 'word2vec1199999'
-    # WORD2VEC_SESSION = 'yonsweng/hate_2/73'
-    print(f'HIDDEN_DIM: {HIDDEN_DIM}')
-    print(f'FILTER_SIZE: {FILTER_SIZE}')
-    print(f'CONV_PADDING: {CONV_PADDING}')
-    print(f'DROPOUT_RATE: {DROPOUT_RATE}')
-    print(f'EMBEDDING_SIZE: {EMBEDDING_SIZE}')
-    print(f'BATCH_SIZE: {BATCH_SIZE}')
-    print(f'GRU_LAYERS: {GRU_LAYERS}')
-    print(f'LEARNING_RATE: {LEARNING_RATE}')
-    # print(f'WORD2VEC_LOAD: {WORD2VEC_LOAD}')
-    # print(f'WORD2VEC_CHECKPOINT: {WORD2VEC_CHECKPOINT}')
-    # print(f'WORD2VEC_SESSION: {WORD2VEC_SESSION}')
 
     parser = ArgumentParser()
     parser.add_argument('--mode', default='train')
@@ -285,7 +270,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     task = HateSpeech()
     vocab_size = task.max_vocab_indexes['syllable_contents']
-    model = BaseLine(HIDDEN_DIM, FILTER_SIZE, DROPOUT_RATE, vocab_size, EMBEDDING_SIZE, GRU_LAYERS, CONV_PADDING)
+    model = BaseLine(HIDDEN_DIM, FILTER_SIZE, DROPOUT_RATE, vocab_size, EMBEDDING_SIZE, BI_RNN_LAYERS, UNI_RNN_LAYERS)
     if args.pause:
         model.to("cuda")
         bind_model(model)
