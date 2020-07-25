@@ -270,7 +270,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     task = HateSpeech()
     vocab_size = task.max_vocab_indexes['syllable_contents']
-    model = BaseLine(HIDDEN_DIM, FILTER_SIZE, DROPOUT_RATE, vocab_size, EMBEDDING_SIZE, BI_RNN_LAYERS, UNI_RNN_LAYERS)
+    model = BaseLine(HIDDEN_DIM, DROPOUT_RATE, vocab_size, EMBEDDING_SIZE, BI_RNN_LAYERS, UNI_RNN_LAYERS)
     if args.pause:
         model.to("cuda")
         bind_model(model)

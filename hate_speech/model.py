@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 class BaseLine(nn.Module):
-    def __init__(self, hidden_dim, filter_size, dropout_rate, vocab_size, embedding_dim, bi_rnn_layers, uni_rnn_layers, pre_trained_embedding=None):
+    def __init__(self, hidden_dim, dropout_rate, vocab_size, embedding_dim, bi_rnn_layers, uni_rnn_layers, pre_trained_embedding=None):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.filter_size = filter_size
