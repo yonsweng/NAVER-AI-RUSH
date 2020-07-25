@@ -100,8 +100,8 @@ class Trainer(object):
             train_f1_score = f1_score(y_true, y_pred)
             # print(json.dumps(
             #     {'type': 'train', 'dataset': 'hate_speech',
-            #      'epoch': epoch, 'loss': loss_sum / total_len, 'acc': acc_sum / total_len,
-            #      'recall': train_recall_score, 'precision': train_precision_score, 'f1': train_f1_score}))
+            #      'epoch': epoch, 'f1': train_f1_score, 'loss': loss_sum / total_len, 'acc': acc_sum / total_len,
+            #      'recall': train_recall_score, 'precision': train_precision_score}))
 
             true_lst, pred_lst, loss_avg, acc_lst, te_total = self.eval(self.test_iter, len(self.task.datasets[1]))
 
@@ -113,8 +113,8 @@ class Trainer(object):
             test_f1_score = f1_score(y_true, y_pred)
             print(json.dumps(
                 {'type': 'test', 'dataset': 'hate_speech',
-                 'epoch': epoch, 'loss': loss_avg,  'acc': sum(acc_lst) / te_total,
-                 'recall': test_recall_score, 'precision': test_precision_score, 'f1': test_f1_score}))
+                 'epoch': epoch, 'f1': test_f1_score, 'loss': loss_avg,  'acc': sum(acc_lst) / te_total,
+                 'recall': test_recall_score, 'precision': test_precision_score}))
             nsml.save(epoch)
             self.save_model(self.model, 'e{}'.format(epoch))
 
@@ -156,7 +156,7 @@ if __name__ == '__main__':
     HIDDEN_DIM = 256
     DROPOUT_RATE = 0.3
     EMBEDDING_SIZE = 384
-    BATCH_SIZE = 32
+    BATCH_SIZE = 256
     BI_RNN_LAYERS = 1
     UNI_RNN_LAYERS = 1
     LEARNING_RATE = 0.001
