@@ -29,18 +29,12 @@ class BaseLine(nn.Module):
 
     def forward(self, x):
         # x: (sentence_len, batch_size)
-        x = self.embedding(x).transpose(0, 1).transpose(1, 2)
-        # x: (batch_size, embedding_dim, sentence_len)
-        # x = self.conv1d(x).transpose(1, 2).transpose(0, 1)
-        x = x.transpose(1, 2).transpose(0, 1)
+        x = self.embedding(x)
         # x: (sentence_len, batch_size, embedding_dim)
-        x = self.relu(x)
         x = self.dropout(x)
-        # x_res = x
-        # x_res: (sentence_len, batch_size, embedding_dim)
         x, _ = self.bi_rnn(x)
         # x: (sentence_len, batch_size, hidden_dim)
-        # x, _ = self.uni_rnn(x + x_res)
+        x = self.relu(x)
         x, _ = self.uni_rnn(x)
         # x: (sentence_len, batch_size, hidden_dim)
         x = self.dropout(x)
