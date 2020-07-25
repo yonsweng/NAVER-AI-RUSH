@@ -155,7 +155,7 @@ if __name__ == '__main__':
     # Constants
     HIDDEN_DIM = 256
     DROPOUT_RATE = 0.3
-    EMBEDDING_SIZE = 256
+    EMBEDDING_SIZE = 128
     BATCH_SIZE = 512
     BI_RNN_LAYERS = 1
     UNI_RNN_LAYERS = 1
