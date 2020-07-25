@@ -47,114 +47,12 @@ class Trainer(object):
     def __init__(self, model, hdfs_host: str = None, device: str = 'cpu'):
         self.device = device
         self.task = HateSpeech(self.TRAIN_DATA_PATH, (9, 1))  # train 9 : test 1
-        # self.embedding = self.train_embedding()
         self.model = model
         self.model.to(self.device)
         self.loss_fn = nn.BCELoss()
         self.batch_size = BATCH_SIZE
         self.__test_iter = None
         bind_model(self.model)
-
-    def train_embedding(self):
-        word2vec = Word2Vec(self.task.max_vocab_indexes['syllable_contents'], EMBEDDING_SIZE)
-        word2vec.to('cuda')
-        bind_model(word2vec)
-        if WORD2VEC_LOAD:
-            nsml.load(WORD2VEC_CHECKPOINT, session=WORD2VEC_SESSION)
-        else:
-            preprocessed = []
-            with open(self.TRAIN_DATA_PATH) as fp:
-                for line in fp:
-                    if line:
-                        tokens = json.loads(line)['syllable_contents']
-                        preprocessed.append(tokens)
-            with open(self.UNLABELED_DATA_PATH) as fp:
-                for line in fp:
-                    if line:
-                        tokens = json.loads(line)['syllable_contents']
-                        preprocessed.append(tokens)
-            print('# of sentences:', len(preprocessed))
-
-            # count occurrences of tokens
-            token_cnt = [0] * self.task.max_vocab_indexes['syllable_contents']
-            for sentence in preprocessed:
-                for token in sentence:
-                    token_cnt[token] += 1
-            token_sum = sum(token_cnt)
-            token_prob = [cnt / token_sum for cnt in token_cnt]
-            # print('token probabilities')
-            # print('2:', token_prob[2])
-            # print('100:', token_prob[100])
-            token_prob = [prob ** 0.75 for prob in token_prob]
-            token_prob_sum = sum(token_prob)
-            token_prob = [prob / token_prob_sum for prob in token_prob]
-            # print('token adjusted probabilities')
-            # print('2:', token_prob[2])
-            # print('100:', token_prob[100])
-            tokens = [i for i in range(self.task.max_vocab_indexes['syllable_contents'])]
-
-            lr = 0.03
-            print('word2vec lr:', lr)
-            optimizer = optim.Adam(word2vec.parameters(), lr=lr)
-            loss_fn = nn.BCELoss()
-            losses = []
-            batch_cnt = 0
-            negative_sample_size = 5
-            window_size = 5
-            word2vec_batch_size = 1024
-            for epoch in range(1):
-                print('word2vec epoch:', epoch)
-                epoch_loss = 0
-                epoch_token_cnt = 0
-                sentence_loss = 0
-                sentence_token_cnt = 0
-                random.shuffle(preprocessed)
-                for i_sentence, sentence in enumerate(preprocessed):
-                    if (i_sentence+1) % 10000 == 0:
-                        print(i_sentence+1, 'loss:', sentence_loss/sentence_token_cnt)
-                        nsml.report(step=i_sentence+1, loss=sentence_loss/sentence_token_cnt)
-                        sentence_loss = 0
-                        sentence_token_cnt = 0
-                        
-                    # save checkpoint
-                    if (i_sentence+1) % 100000 == 0:
-                        nsml.save('word2vec' + str(i_sentence+1))
-
-                    # sample only 5
-                    for center in random.sample(range(len(sentence)), min(10, len(sentence))):
-                    # for center in range(len(sentence)):
-                        left = center - window_size
-                        if left < 0:
-                            left = 0
-                        right = center + window_size
-
-                        # negative sample
-                        negative_sample = np.random.choice(tokens, negative_sample_size, p=token_prob)
-                        positive_sample = np.array([sentence[center]])
-                        sample = np.concatenate([positive_sample, negative_sample])
-                        target = np.where(sample == sentence[center], 1., 0.)
-                        sample = torch.tensor(sample, device='cuda')
-                        target = torch.tensor(target, device='cuda')
-
-                        x = torch.tensor(sentence[left:center] + sentence[center+1:right+1], device='cuda')
-                        output = word2vec(x, sample)  # (vocab_size,)
-                        losses.append(loss_fn(output.double(), target.double()))
-
-                        batch_cnt += 1
-                        if batch_cnt == word2vec_batch_size:
-                            optimizer.zero_grad()
-                            loss = sum(losses)
-                            epoch_loss += loss.tolist()
-                            sentence_loss += loss.tolist()
-                            sentence_token_cnt += word2vec_batch_size
-                            epoch_token_cnt += word2vec_batch_size
-                            loss.backward()
-                            losses = []
-                            optimizer.step()
-                            batch_cnt = 0
-                print('loss:', epoch_loss / epoch_token_cnt)
-        # print(word2vec.embedding.weight[2])
-        return word2vec.embedding.weight
 
     @property
     def test_iter(self) -> Iterator:
