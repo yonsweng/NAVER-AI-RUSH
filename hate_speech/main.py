@@ -98,10 +98,10 @@ class Trainer(object):
             train_recall_score = recall_score(y_true, y_pred)
             train_precision_score = precision_score(y_true, y_pred)
             train_f1_score = f1_score(y_true, y_pred)
-            print(json.dumps(
-                {'type': 'train', 'dataset': 'hate_speech',
-                 'epoch': epoch, 'loss': loss_sum / total_len, 'acc': acc_sum / total_len,
-                 'recall': train_recall_score, 'precision': train_precision_score, 'f1': train_f1_score}))
+            # print(json.dumps(
+            #     {'type': 'train', 'dataset': 'hate_speech',
+            #      'epoch': epoch, 'loss': loss_sum / total_len, 'acc': acc_sum / total_len,
+            #      'recall': train_recall_score, 'precision': train_precision_score, 'f1': train_f1_score}))
 
             true_lst, pred_lst, loss_avg, acc_lst, te_total = self.eval(self.test_iter, len(self.task.datasets[1]))
 
@@ -119,12 +119,12 @@ class Trainer(object):
             self.save_model(self.model, 'e{}'.format(epoch))
 
             # plot graphs
-            train_loss = loss_sum / total_len
             test_loss = loss_avg
-            nsml.report(step=epoch, train_loss=train_loss,
-                        train_recall=train_recall_score, train_precision=train_precision_score, train_f1=train_f1_score)
-            nsml.report(step=epoch, test_loss=test_loss,
-                        test_recall=test_recall_score, test_precision=test_precision_score, test_f1=test_f1_score)
+            train_loss = loss_sum / total_len
+            nsml.report(step=epoch, test_f1=test_f1_score,
+                        test_recall=test_recall_score, test_precision=test_precision_score, test_loss=test_loss)
+            nsml.report(step=epoch, train_f1=train_f1_score,
+                        train_recall=train_recall_score, train_precision=train_precision_score, train_loss=train_loss)
 
     def eval(self, iter:Iterator, total:int) -> (List[float], float, List[float], int):
         true_lst = list()
