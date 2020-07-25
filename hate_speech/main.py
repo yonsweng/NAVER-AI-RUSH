@@ -121,10 +121,10 @@ class Trainer(object):
             # plot graphs
             test_loss = loss_avg
             train_loss = loss_sum / total_len
-            nsml.report(step=epoch, test_f1=test_f1_score,
-                        test_recall=test_recall_score, test_precision=test_precision_score, test_loss=test_loss)
-            nsml.report(step=epoch, train_f1=train_f1_score,
-                        train_recall=train_recall_score, train_precision=train_precision_score, train_loss=train_loss)
+            nsml.report(step=epoch, test_f1=test_f1_score, test_loss=test_loss,
+                        test_recall=test_recall_score, test_precision=test_precision_score)
+            nsml.report(step=epoch, train_f1=train_f1_score, train_loss=train_loss,
+                        train_recall=train_recall_score, train_precision=train_precision_score)
 
     def eval(self, iter:Iterator, total:int) -> (List[float], float, List[float], int):
         true_lst = list()
@@ -156,7 +156,7 @@ if __name__ == '__main__':
     HIDDEN_DIM = 256
     DROPOUT_RATE = 0.3
     EMBEDDING_SIZE = 384
-    BATCH_SIZE = 64
+    BATCH_SIZE = 32
     BI_RNN_LAYERS = 1
     UNI_RNN_LAYERS = 1
     LEARNING_RATE = 0.001
