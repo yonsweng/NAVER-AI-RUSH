@@ -9,6 +9,7 @@ from torchtext.vocab import Vocab
 import torch
 from nsml.constants import DATASET_PATH
 import random
+import math
 
 
 class HateSpeech(object):
@@ -24,17 +25,19 @@ class HateSpeech(object):
 
     VOCAB_PATH = 'fields.json'
 
-    def __init__(self, corpus_path=None, split: Tuple[int, int] = None):
+    def __init__(self, corpus_path=None, fold=None, n_folds=None, split: Tuple[int, int] = None):
         self.fields, self.max_vocab_indexes = self.load_fields(self.VOCAB_PATH)
 
         if corpus_path:
             self.examples = self.load_corpus(corpus_path)
-            if split:
+            if fold is not None:
                 random.Random(2020).shuffle(self.examples)
                 total = len(self.examples)
-                pivot = int(total / sum(split) * split[0])
-                self.datasets = [Dataset(self.examples[:pivot], fields=self.fields),
-                                 Dataset(self.examples[pivot:], fields=self.fields)]
+                test_size = math.ceil(total / n_folds)
+                train_examples = self.examples[:test_size*fold] + self.examples[test_size*(fold+1):]
+                test_examples = self.examples[test_size*fold:test_size*(fold+1)]
+                self.datasets = [Dataset(train_examples, fields=self.fields),
+                                 Dataset(test_examples, fields=self.fields)]
             else:
                 self.datasets = [Dataset(self.examples, fields=self.fields)]
 

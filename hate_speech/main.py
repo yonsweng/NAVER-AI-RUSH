@@ -40,15 +40,46 @@ def bind_model(model):
     nsml.bind(save=save, load=load, infer=infer)
 
 
+# models = [model0, model1, ...]
+def bind_models(models):  # for ensemble
+    def save(dirname, *args):
+        checkpoint = {
+            f'model{i}': model.state_dict() for i, model in enumerate(models)
+        }
+        torch.save(checkpoint, os.path.join(dirname, 'model.pt'))
+
+    def load(dirname, *args):
+        checkpoint = torch.load(os.path.join(dirname, 'model.pt'))
+        for i, model in enumerate(models):
+            model.load_state_dict(checkpoint[f'model{i}'])
+
+    def infer(raw_data, **kwargs):
+        for model in models:
+            model.eval()
+        examples = HateSpeech(raw_data).examples
+        tensors = [torch.tensor(ex.syllable_contents, device='cuda').reshape([-1, 1]) for ex in examples]
+        results = []
+        for ex in tensors:
+            total = 0
+            for model in models:  # vote
+                total += torch.where(model(ex) > 0.5, torch.tensor(1.0, device='cuda'), torch.tensor(0.0, device='cuda'))
+            total = total / len(models)  # len must be an odd number
+            results.append(total.tolist())
+        return results
+
+    nsml.bind(save=save, load=load, infer=infer)
+
+
 class Trainer(object):
     TRAIN_DATA_PATH = '{}/train/train_data'.format(DATASET_PATH[0])
     UNLABELED_DATA_PATH = '{}/train/raw.json'.format(DATASET_PATH[1])
 
-    def __init__(self, model, hdfs_host: str = None, device: str = 'cpu'):
+    def __init__(self, model, model_i, n_models, hdfs_host: str = None, device: str = 'cpu'):
         self.device = device
-        self.task = HateSpeech(self.TRAIN_DATA_PATH, (9, 1))  # train 9 : test 1
+        self.task = HateSpeech(self.TRAIN_DATA_PATH, model_i, n_models)
         self.model = model
         self.model.to(self.device)
+        self.model_i = model_i
         self.loss_fn = nn.BCELoss()
         self.batch_size = BATCH_SIZE
         self.__test_iter = None
@@ -71,6 +102,8 @@ class Trainer(object):
         total_len = len(self.task.datasets[0])
         ds_iter = Iterator(self.task.datasets[0], batch_size=self.batch_size, repeat=False,
                            sort_key=lambda x: len(x.syllable_contents), train=True, device=self.device)
+        best_f1_score = 0
+        best_state_dict = self.model.state_dict()
 
         for epoch in range(max_epoch):
             loss_sum, acc_sum = 0., 0.
@@ -115,8 +148,11 @@ class Trainer(object):
                 {'type': 'test', 'dataset': 'hate_speech',
                  'epoch': epoch, 'f1': test_f1_score, 'loss': loss_avg,  'acc': sum(acc_lst) / te_total,
                  'recall': test_recall_score, 'precision': test_precision_score}))
-            nsml.save(epoch)
-            self.save_model(self.model, 'e{}'.format(epoch))
+            nsml.save(str(self.model_i) + '-' + str(epoch))
+            if test_f1_score > best_f1_score:
+                best_state_dict = model.state_dict()
+                nsml.save(str(self.model_i) + '-best')
+                best_f1_score = test_f1_score
 
             # plot graphs
             test_loss = loss_avg
@@ -125,6 +161,8 @@ class Trainer(object):
                         test_recall=test_recall_score, test_precision=test_precision_score)
             nsml.report(step=epoch, train_f1=train_f1_score, train_loss=train_loss,
                         train_recall=train_recall_score, train_precision=train_precision_score)
+
+        return best_state_dict, best_f1_score
 
     def eval(self, iter:Iterator, total:int) -> (List[float], float, List[float], int):
         true_lst = list()
@@ -160,6 +198,7 @@ if __name__ == '__main__':
     BI_RNN_LAYERS = 1
     UNI_RNN_LAYERS = 1
     LEARNING_RATE = 0.001
+    ENSEMBLE_SIZE = 5
 
     parser = ArgumentParser()
     parser.add_argument('--mode', default='train')
@@ -167,11 +206,25 @@ if __name__ == '__main__':
     args = parser.parse_args()
     task = HateSpeech()
     vocab_size = task.max_vocab_indexes['syllable_contents']
-    model = BaseLine(HIDDEN_DIM, DROPOUT_RATE, vocab_size, EMBEDDING_SIZE, BI_RNN_LAYERS, UNI_RNN_LAYERS)
+    models = []
+    for i in range(ENSEMBLE_SIZE):
+        model = BaseLine(HIDDEN_DIM, DROPOUT_RATE, vocab_size, EMBEDDING_SIZE, BI_RNN_LAYERS, UNI_RNN_LAYERS)
+        model.to('cuda')
+        models.append(model)
+
     if args.pause:
-        model.to("cuda")
-        bind_model(model)
+        bind_models(models)
         nsml.paused(scope=locals())
     if args.mode == 'train':
-        trainer = Trainer(model, device='cuda')
-        trainer.train()
+        scores = []
+        for i, model in enumerate(models):
+            trainer = Trainer(model, i, ENSEMBLE_SIZE, device='cuda')
+            best_state_dict, best_f1_score = trainer.train()
+            model.load_state_dict(best_state_dict)
+            scores.append(best_f1_score)
+            print('best f1 score:', best_f1_score)
+
+        print('avg f1 score:', sum(scores) / len(scores))
+
+        bind_models(models)
+        nsml.save('ensemble')
